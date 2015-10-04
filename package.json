@@ -15,6 +15,7 @@
     "construx-dustjs": "^1.1.0",
     "dust-makara-helpers": "^4.1.2",
     "express": "^4.12.2",
+    "ioredis": "^1.9.1",
     "kraken-js": "^1.0.3",
     "makara": "^2.0.3",
     "slack-client": "^1.4.1"
