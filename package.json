@@ -18,6 +18,7 @@
     "ioredis": "^1.9.1",
     "kraken-js": "^1.0.3",
     "makara": "^2.0.3",
+    "request": "^2.64.0",
     "slack-client": "^1.4.1"
   },
   "devDependencies": {
