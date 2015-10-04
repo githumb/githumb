@@ -1,92 +1,95 @@
 {
-    "express": {
-        "view cache": false,
-        "view engine": "js",
-        "views": "path:./.build/templates"
-    },
-
-    "view engines": {
-        "js": {
-            "module": "makara",
-            "renderer": {
-                "method": "js",
-                "arguments": [
-                    { "cache": true, "helpers": "config:dust.helpers" }
-                ]
-            }
-        }
-    },
-
     "dust": {
         "helpers": [
             "dust-makara-helpers"
         ]
     },
-
+    "express": {
+        "view cache": false,
+        "view engine": "js",
+        "views": "path:./.build/templates"
+    },
+    "githumb": {
+        "bot": {
+            "admins": [
+                "andes90",
+                "gde.satrigraha",
+                "hendra"
+            ]
+        },
+        "ulartangga_url": "http://www.google.com"
+    },
     "i18n": {
         "contentPath": "path:./locales",
         "fallback": "en-US"
     },
-
-    "specialization": {
-    },
-
     "middleware": {
-
-        "makara": {
-            "priority": 100,
+        "appsec": {
+            "module": {
+                "arguments": [
+                    {
+                        "csp": false,
+                        "p3p": false,
+                        "xframe": "SAMEORIGIN"
+                    }
+                ]
+            }
+        },
+        "csrf": {
             "enabled": true,
             "module": {
-                "name": "makara",
+                "arguments": [
+                    {}
+                ],
+                "method": "csrf",
+                "name": "lusca"
+            },
+            "priority": 111,
+            "route": "/((?!payload))*"
+        },
+        "makara": {
+            "enabled": true,
+            "module": {
                 "arguments": [
                     {
                         "i18n": "config:i18n",
                         "specialization": "config:specialization"
                     }
-                ]
-            }
+                ],
+                "name": "makara"
+            },
+            "priority": 100
         },
-
-        "static": {
-            "module": {
-                "arguments": [ "path:./.build" ]
-            }
-        },
-
         "router": {
-            "module": {
-                "arguments": [{ "directory": "path:./controllers" }]
-            }
-        },
-
-        "appsec": {
             "module": {
                 "arguments": [
                     {
-                        "xframe": "SAMEORIGIN",
-                        "p3p": false,
-                        "csp": false
+                        "directory": "path:./controllers"
                     }
                 ]
             }
         },
-
-        "csrf": {
-            "enabled": true,
-            "priority": 111,
-            "route": "/((?!payload))*",
+        "static": {
             "module": {
-                "name": "lusca",
-                "method": "csrf",
-                "arguments": [ {} ]
+                "arguments": [
+                    "path:./.build"
+                ]
             }
         }
-
     },
-
-    "githumb": {
-        "bot": {
-            "admins": ["andes90", "gde.satrigraha", "hendra"]
+    "specialization": {},
+    "view engines": {
+        "js": {
+            "module": "makara",
+            "renderer": {
+                "arguments": [
+                    {
+                        "cache": true,
+                        "helpers": "config:dust.helpers"
+                    }
+                ],
+                "method": "js"
+            }
         }
     }
 }
