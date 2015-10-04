@@ -3,6 +3,7 @@
 var githumbBot = require("./githumb_bot_service");
 var Github = require('./external/github/label');
 var Log = require('log');
+var expiredLogic = require('./expired_notify')
 
 var github = Github('githumbot', 'githumb123');
 var logger = new Log('info');
@@ -32,7 +33,8 @@ module.exports = function(body, res, redis) {
           url: body.issue.html_url,
           author: body.issue.user.login,
         }, function(success) {
-          logger.info("added reviewed label");
+          console.log("added reviewed label");
+          expiredLogic.removeFromExpiredNotify(body);
         });
       });
     }
