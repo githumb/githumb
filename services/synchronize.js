@@ -2,6 +2,9 @@
 
 var Github = require('./external/github/label');
 var github = Github('githumbot', 'githumb123');
+var Log = require('log');
+var githumbBot = require("./githumb_bot_service");
+var logger = new Log('info');
 
 module.exports = function(body, res, redis) {
   var pullId = body.repository.id + '-' + body.pull_request.number;
@@ -21,8 +24,15 @@ module.exports = function(body, res, redis) {
       redis.set(pullId, JSON.stringify(pull));
 
       github.removeLabelReviewed(body.repository.owner.login, body.repository.name, body.pull_request.number, function(err, _res, _body) {
-        // TODO notify unlabeled
-        console.log("removed reviewed label");
+        githumbBot.notifyPullRequestUnreviewed({
+          repoFullName: body.repository.full_name,
+          title: body.pull_request.title,
+          id: body.pull_request.number,
+          url: body.pull_request.html_url,
+          author: body.pull_request.user.login,
+        }, function(success) {
+          logger.info("removed reviewed label")
+        });
       });
     }
 

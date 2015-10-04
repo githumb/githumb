@@ -1,10 +1,12 @@
 'use strict';
 
-var Github = require('./external/github/label');
-var github = Github('githumbot', 'githumb123');
-var Log = require('log');
 var githumbBot = require("./githumb_bot_service");
+var Github = require('./external/github/label');
+var Log = require('log');
 var expiredLogic = require('./expired_notify')
+
+var github = Github('githumbot', 'githumb123');
+var logger = new Log('info');
 
 module.exports = function(body, res, redis) {
   var pullId = body.repository.id + '-' + body.issue.number;
@@ -14,7 +16,7 @@ module.exports = function(body, res, redis) {
   redis.get(pullId, function(err, result) {
     console.log('entry on redis: ' + result);
 
-    var pull = parsePull(pullId, result);
+    var pull = parse(pullId, result);
 
     incrementOk(pull);
 
@@ -42,7 +44,7 @@ module.exports = function(body, res, redis) {
     console.log('\n===end of request===\n \n\n\n\n\n');
   });
 
-  function parsePull(id, result) {
+  function parse(id, result) {
     if (result == null) {
       return {
         id: id,

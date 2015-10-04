@@ -3,20 +3,29 @@
 var okCommentLogic = require('./ok_comment');
 var synchronizeLogic = require('./synchronize');
 var expiredLogic = require('./expired_notify')
+var reviewCommentLogic = require('./review_comment');
 var Redis = require('ioredis');
 
-var redis = new Redis({
+var database9 = new Redis({
   port: 6379,
   host: '127.0.0.1',
-  db: 8
+  db: 9
 });
 
-function isPullRequestCommentOk(body) {
-  return body.action === 'created' && body.comment !== null && body.comment.body.trim() === ':ok_hand:';
+function isPullRequestCommentOk(req) {
+      return req.headers['x-github-event'] === 'issue_comment' && req.body.comment.body.trim() === ':ok_hand:';
+    }
+
+function isSynchronize(req) {
+  return req.headers['x-github-event'] === 'pull_request' && req.body.action === 'synchronize' && isOpen(req.body);
 }
 
-function isSynchronize(body) {
-  return body.action === 'synchronize' && body.pull_request.state === 'open';
+function isPullRequestReviewComment(req) {
+  return req.headers['x-github-event'] === 'pull_request_review_comment' && isOpen(req.body);
+}
+
+function isOpen(body) {
+  return body.pull_request.state === 'open';
 }
 
 function isNewOpenedPullRequest(body) {
@@ -33,6 +42,7 @@ module.exports = function(req, res) {
     synchronizeLogic(body, res, redis);
   } else if (isNewOpenedPullRequest(body)) {
     expiredLogic.addToExpiredNotify(body)
+  } else if (isPullRequestReviewComment(req)) {
+    reviewCommentLogic(body, res, database9);
   }
-
 };
