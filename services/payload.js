@@ -15,18 +15,27 @@ module.exports = function(req, res) {
 
     var body = req.body;
 
-    if (isPullRequestCommentOk(body)) {
+    if (isPullRequestCommentOk(req)) {
       okCommentLogic(body, res, redis);
-    } else if (isSynchronize(body)) {
+    } else if (isSynchronize(req)) {
       synchronizeLogic(body, res, redis);
+    } else if (isPullRequestReviewComment(req)) {
     }
 
-    function isPullRequestCommentOk(body) {
-      return body.action === 'created' && body.comment !== null && body.comment.body.trim() === ':ok_hand:';
+    function isPullRequestCommentOk(req) {
+      return req.headers['x-github-event'] === 'issue_comment' && req.body.comment.body.trim() === ':ok_hand:';
     }
 
-    function isSynchronize(body) {
-      return body.action === 'synchronize' && body.pull_request.state === 'open';
+    function isSynchronize(req) {
+      return req.headers['x-github-event'] === 'pull_request' && req.body.action === 'synchronize' && isOpen(req.body);
+    }
+
+    function isPullRequestReviewComment(req) {
+      return req.headers['x-github-event'] === 'pull_request_review_comment' && isOpen(req.body);
+    }
+
+    function isOpen(body) {
+      return body.pull_request.state === 'open';
     }
 };
 
