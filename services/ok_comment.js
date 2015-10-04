@@ -19,13 +19,10 @@ module.exports = function(body, res, redis) {
 
     redis.set(pullId, JSON.stringify(pull));
 
-    console.log('total ok: ' + pull.total_ok);
-
-    if (pull.total_ok >= 2) {
+    if (pull.current_ok >= 2) {
       console.log('pull request is completed');
 
       github.addLabelReviewed(body.repository.owner.login, body.repository.name, body.issue.number, function(err, _res, _body) {
-        // TODO notify labeled
         githumbBot.notifyPullRequestReviewed({
           repoFullName: body.repository.full_name,
           title: body.issue.title,
@@ -33,7 +30,7 @@ module.exports = function(body, res, redis) {
           url: body.issue.html_url,
           author: body.issue.user.login,
         }, function(success) {
-          console.log("added review label");
+          console.log("added reviewed label");
         });
       });
     }

@@ -22,6 +22,23 @@ module.exports = function(username, password) {
             }
           }, callback)
           .auth(username, password);
+    },
+
+    removeLabelReviewed: function(owner, repo, number, callback) {
+      console.log('removing reviewed label');
+
+      var url = GITHUB_HOST + `/repos/${owner}/${repo}/issues/${number}/labels`;
+
+      request
+          .del({
+            url: url,
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+              'User-Agent': 'kodok'
+            }
+          }, callback)
+          .auth(username, password);
     }
   };
 }
