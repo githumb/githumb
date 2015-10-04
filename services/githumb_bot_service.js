@@ -27,7 +27,9 @@ var slackClient = new SlackService(function(message) {
     tryHandleBindRepoToChannel(message);
     tryHandleUnbindRepoFromChannel(message);
     tryHandleAddUserToRepo(message);
+    tryHandleAddMeToRepo(message);
     tryHandleMapUserToGithubLogin(message);
+    tryHandleMapMeToGithubLogin(message);
 });
 
 function tryHandleBindRepoToChannel(message) {
@@ -75,13 +77,45 @@ function tryHandleAddUserToRepo(message) {
         if (config.githumb.bot.admins.find(function(element, index, array) {
             return element == commandIssuer.name;
         }) == null) {
-            var channel = slackClient.getChannelGroupOrDMByID(message.channel);
-            channel.send("You're not authorized to do this :fu: :fu: :fu:");
+            sendMessageToChannel(message.channel, "You're not authorized to do this :fu: :fu: :fu:");
             return;
         }
 
         var userIds = extractUserIdsFromString(regexResult[1]);
         var repoFullName = regexResult[2];
+
+        bindUserIdsToRepo(userIds, repoFullName, function(success) {
+            if (success) {
+                sendMessageToChannel(message.channel, ":ok_hand:");
+                userIds.forEach(function(f) {
+                    sendDmToUserId(f, "You've been added to repo [" + repoFullName + "] :fu: by <@" + commandIssuer.id + ">");
+                });
+            } else {
+                sendMessageToChannel(message.channel, ":fu:");
+            }
+        }, function(userId) {
+            sendMessageToChannel(message.channel, "User <@" + userId + "> is not mapped to Github Login yet :fu: :fu: :fu:");
+        });
+    }
+}
+
+function tryHandleAddMeToRepo(message) {
+    if (message == null || message.text == null || message.user == null) {
+        return;
+    }
+    var regexResult = message.text.match(/add\s+me\s+to\s+(.+)/i);
+
+    if (regexResult != null && regexResult[1] != null) {
+        var commandIssuer = slackClient.getUserByID(message.user);
+        if (config.githumb.bot.admins.find(function(element, index, array) {
+            return element == commandIssuer.name;
+        }) == null) {
+            sendMessageToChannel(message.channel, "You're not authorized to do this :fu: :fu: :fu:");
+            return;
+        }
+
+        var userIds = [message.user];
+        var repoFullName = regexResult[1];
 
         bindUserIdsToRepo(userIds, repoFullName, function(success) {
             if (success) {
@@ -109,13 +143,42 @@ function tryHandleMapUserToGithubLogin(message) {
         if (config.githumb.bot.admins.find(function(element, index, array) {
             return element == commandIssuer.name;
         }) == null) {
-            var channel = slackClient.getChannelGroupOrDMByID(message.channel);
-            channel.send("You're not authorized to do this :fu: :fu: :fu:");
+            sendMessageToChannel(message.channel, "You're not authorized to do this :fu: :fu: :fu:");
             return;
         }
 
         var userIds = extractUserIdsFromString(regexResult[1]);
         var githubLogin = regexResult[2];
+
+        userIds.forEach(function(userId) {
+            bindUserIdToGithubLogin(userId, githubLogin, function(success) {
+                if (success) {
+                    sendMessageToChannel(message.channel, ":ok_hand:");
+                } else {
+                    sendMessageToChannel(message.channel, ":fu:");
+                }
+            });
+        })
+    }
+}
+
+function tryHandleMapMeToGithubLogin(message) {
+    if (message == null || message.text == null || message.user == null) {
+        return;
+    }
+
+    var regexResult = message.text.match(/set\s+my\s+github\s+login\s+as\s+(.+)/i);
+    if (regexResult != null && regexResult[1] != null) {
+        var commandIssuer = slackClient.getUserByID(message.user);
+        if (config.githumb.bot.admins.find(function(element, index, array) {
+            return element == commandIssuer.name;
+        }) == null) {
+            sendMessageToChannel(message.channel, "You're not authorized to do this :fu: :fu: :fu:");
+            return;
+        }
+
+        var userIds = [message.user];
+        var githubLogin = regexResult[1];
 
         userIds.forEach(function(userId) {
             bindUserIdToGithubLogin(userId, githubLogin, function(success) {
@@ -300,17 +363,21 @@ function pullRequestReminderJobStep4(repoFullName, slackUserIdSet, pullRequest, 
 
         slackUserIds.forEach(function(slackUserId) {
             redis.hget("userGithubLogins", slackUserId, function(_err, _result) {
-                if (_err == null && _result != null) {
-                    var githubLogin = _result;
+                if (_err == null) {
+                    if (_result == null) {
+                        sendDmToUserId(slackUserId, "Dude I can't check unreviewed Pull Request because your Github Login is not mapped. Please notify the admin.");
+                    } else {
+                        var githubLogin = _result;
 
-                    if (!reviewComments.find(function(comment, index, array) {
-                        return comment.user.login == githubLogin;
-                    }) && !issueComments.find(function(comment, index, array) {
-                        return comment.user.login == githubLogin;
-                    })) {
-                        var slackUser = slackClient.getUserByID(slackUserId);
-                        logger.info("notifying slackUser: " + slackUser.name + " to review pullRequest: " + pullRequest.number)
-                        sendDmToUserId(slackUserId, "Gays please review Pull Request: "  + pullRequest.title + "(#" + pullRequest.number + "), author: " + pullRequest.user.login + ", url: " + pullRequest.html_url);
+                        if (!reviewComments.find(function(comment, index, array) {
+                            return comment.user.login == githubLogin;
+                        }) && !issueComments.find(function(comment, index, array) {
+                            return comment.user.login == githubLogin;
+                        })) {
+                            var slackUser = slackClient.getUserByID(slackUserId);
+                            logger.info("notifying slackUser: " + slackUser.name + " to review pullRequest: " + pullRequest.number)
+                            sendDmToUserId(slackUserId, "Gays, kindly please review this Pull Request: "  + pullRequest.title + "(#" + pullRequest.number + "), author: " + pullRequest.user.login + ", url: " + pullRequest.html_url);
+                        }
                     }
                 }
             });
