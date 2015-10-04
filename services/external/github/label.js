@@ -39,6 +39,21 @@ module.exports = function(username, password) {
             }
           }, callback)
           .auth(username, password);
-    }
+    },
+
+    getLabelList: function(repoFullName, number, callback) {
+      var url = GITHUB_HOST + `/repos/${repoFullName}/issues/${number}/labels`;
+
+      request
+          .get({
+            url: url,
+            headers: {
+              'Accept': 'application/json',
+              'User-Agent': 'kodok'
+            }
+          }, callback)
+          .auth(username, password);
+    },
+
   };
 }

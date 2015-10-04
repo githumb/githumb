@@ -4,11 +4,13 @@ var SlackService = require('./slack_service');
 var Log = require('log');
 var Redis = require('ioredis');
 var GitHubPullRequest = require('./external/github/pull_request');
+var GitHubLabel = require('./external/github/label');
 var schedule = require('node-schedule');
 var config = require('../config/config');
 
 var logger = new Log('info');
 var gitHubPullRequest = new GitHubPullRequest(config.githumb.github.username, config.githumb.github.password);
+var gitHubLabel = new GitHubLabel(config.githumb.github.username, config.githumb.github.password);
 
 var redis = new Redis({
   port: 6379,
@@ -16,7 +18,7 @@ var redis = new Redis({
   db: 13
 });
 
-schedule.scheduleJob('0 * * * * *', function() {
+schedule.scheduleJob('0 0 * * * *', function() {
     logger.info("executing job pullRequestReminderJobStep1");
     pullRequestReminderJobStep1();
 });
@@ -24,6 +26,7 @@ schedule.scheduleJob('0 * * * * *', function() {
 var slackClient = new SlackService(function(message) {
     logger.info("Received message from slack: " + (message));
 
+    tryHandleNotifyReviewPullRequest(message);
     tryHandleBindRepoToChannel(message);
     tryHandleUnbindRepoFromChannel(message);
     tryHandleAddUserToRepo(message);
@@ -31,6 +34,25 @@ var slackClient = new SlackService(function(message) {
     tryHandleMapUserToGithubLogin(message);
     tryHandleMapMeToGithubLogin(message);
 });
+
+function tryHandleNotifyReviewPullRequest(message) {
+    if (message == null || message.text == null || message.user == null) {
+        return;
+    }
+
+    if (message.text.match(/remind\s+to\s+review\s+pull\s*request.*/i) != null) {
+        var commandIssuer = slackClient.getUserByID(message.user);
+        if (config.githumb.bot.admins.find(function(element, index, array) {
+            return element == commandIssuer.name;
+        }) == null) {
+            sendMessageToChannel(message.channel, "You're not authorized to do this :fu: :fu: :fu:");
+            return;
+        }
+
+        sendMessageToChannel(message.channel, ":ok_hand:");
+        pullRequestReminderJobStep1();
+    }
+}
 
 function tryHandleBindRepoToChannel(message) {
     if (message == null || message.text == null) {
@@ -357,31 +379,40 @@ function pullRequestReminderJobStep3(repoFullName, slackUserIdSet, pullRequest) 
 function pullRequestReminderJobStep4(repoFullName, slackUserIdSet, pullRequest, reviewComments) {
     gitHubPullRequest.getPullRequestIssueCommentList(repoFullName, pullRequest.number, function(err, resp, bodyString) {
         var body = JSON.parse(bodyString);
-        var issueComments = body;
+        pullRequestReminderJobStep5(repoFullName, slackUserIdSet, pullRequest, reviewComments, body);
+    });
+}
 
-        var slackUserIds = Array.from(slackUserIdSet);
+function pullRequestReminderJobStep5(repoFullName, slackUserIdSet, pullRequest, reviewComments, issueComments) {
+    gitHubLabel.getLabelList(repoFullName, pullRequest.number, function(err, resp, bodyString) {
+        var body = JSON.parse(bodyString);
+        if (!body.find(function(label) {
+            return label.name == "reviewed";
+        })) {
+            var slackUserIds = Array.from(slackUserIdSet);
 
-        slackUserIds.forEach(function(slackUserId) {
-            redis.hget("userGithubLogins", slackUserId, function(_err, _result) {
-                if (_err == null) {
-                    if (_result == null) {
-                        sendDmToUserId(slackUserId, "Dude I can't check unreviewed Pull Request because your Github Login is not mapped. Please notify the admin.");
-                    } else {
-                        var githubLogin = _result;
+            slackUserIds.forEach(function(slackUserId) {
+                redis.hget("userGithubLogins", slackUserId, function(_err, _result) {
+                    if (_err == null) {
+                        if (_result == null) {
+                            sendDmToUserId(slackUserId, "Dude I can't check unreviewed Pull Request because your Github Login is not mapped. Please notify the admin.");
+                        } else {
+                            var githubLogin = _result;
 
-                        if (!reviewComments.find(function(comment, index, array) {
-                            return comment.user.login == githubLogin;
-                        }) && !issueComments.find(function(comment, index, array) {
-                            return comment.user.login == githubLogin;
-                        })) {
-                            var slackUser = slackClient.getUserByID(slackUserId);
-                            logger.info("notifying slackUser: " + slackUser.name + " to review pullRequest: " + pullRequest.number)
-                            sendDmToUserId(slackUserId, "Gays, kindly please review this Pull Request: "  + pullRequest.title + "(#" + pullRequest.number + "), author: " + pullRequest.user.login + ", url: " + pullRequest.html_url);
+                            if (!reviewComments.find(function(comment, index, array) {
+                                return comment.user.login == githubLogin;
+                            }) && !issueComments.find(function(comment, index, array) {
+                                return comment.user.login == githubLogin;
+                            })) {
+                                var slackUser = slackClient.getUserByID(slackUserId);
+                                logger.info("notifying slackUser: " + slackUser.name + " to review pullRequest: " + pullRequest.number)
+                                sendDmToUserId(slackUserId, "Gays, kindly please review this Pull Request: "  + pullRequest.title + "(#" + pullRequest.number + "), author: " + pullRequest.user.login + ", url: " + pullRequest.html_url);
+                            }
                         }
                     }
-                }
+                });
             });
-        });
+        }
     });
 }
 
