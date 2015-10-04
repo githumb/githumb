@@ -100,6 +100,10 @@ function buildPullRequestUnreviewedMessage(pullRequest) {
     return "PR `reviewed` label has been revoked: " + pullRequest.title + "(#" + pullRequest.id + "), author: " + pullRequest.author + ", url: " + pullRequest.url;
 }
 
+function buildPullRequestExpiredMessage(pullRequest) {
+    return "Pull request has been `expired`, please kindly review: " + pullRequest.title + "(" + pullRequest.id + "), author: " + pullRequest.author + ", url: " + pullRequest.url;
+}
+
 module.exports = {
     notifyPullRequestReviewed: function(pullRequest, callback) {
         redis.hget("repoChannel", pullRequest.repoFullName, function(err, result) {
@@ -122,6 +126,24 @@ module.exports = {
             if (err == null && result != null) {
                 var channelSet = new Set(JSON.parse(result));
                 var message = buildPullRequestUnreviewedMessage(pullRequest);
+
+                for (let channelId of channelSet) {
+                    var channel = slackClient.getChannelGroupOrDMByID(channelId);
+                    channel.send(message);
+                }
+                callback(true);
+            } else {
+                callback(false);
+            }
+        });
+    },
+
+    notifyPullRequestExpired: function (pullRequest, callback) {
+        redis.hget("repoChannel", pullRequest.repoFullName, function(err, result) {
+            if (err == null && result != null) {
+                var channelSet = new Set(JSON.parse(result));
+                var message = buildPullRequestExpiredMessage(pullRequest);
+
                 for (let channelId of channelSet) {
                     var channel = slackClient.getChannelGroupOrDMByID(channelId);
                     channel.send(message);
