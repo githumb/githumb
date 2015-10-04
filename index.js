@@ -2,7 +2,7 @@
 
 var express = require('express');
 var kraken = require('kraken-js');
-
+var githumbBotService = require('./services/githumb_bot_service')
 
 var options, app;
 
