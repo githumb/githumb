@@ -4,6 +4,7 @@ var Github = require('./external/github/label');
 var github = Github('githumbot', 'githumb123');
 var Log = require('log');
 var githumbBot = require("./githumb_bot_service");
+var logger = new Log('info');
 
 module.exports = function(body, res, redis) {
   var pullId = body.repository.id + '-' + body.issue.number;
@@ -30,7 +31,7 @@ module.exports = function(body, res, redis) {
           url: body.issue.html_url,
           author: body.issue.user.login,
         }, function(success) {
-          console.log("added reviewed label");
+          logger.info("added reviewed label");
         });
       });
     }
