@@ -118,7 +118,7 @@ module.exports = {
     },
 
     notifyPullRequestExpired: function (pullRequest, callback) {
-        redis.get(pullRequest.repoFullName, function(err, result) {
+        redis.hget("repoChannel", pullRequest.repoFullName, function(err, result) {
             if (err == null && result != null) {
                 var channelSet = new Set(JSON.parse(result));
                 var message = buildPullRequestExpiredMessage(pullRequest);
