@@ -3,9 +3,12 @@
 var SlackService = require('./slack_service');
 var Log = require('log');
 var Redis = require('ioredis');
-var config = require('../config/config')
+var GitHubPullRequest = require('./external/github/pull_request');
+var schedule = require('node-schedule');
+var config = require('../config/config');
 
 var logger = new Log('info');
+var gitHubPullRequest = new GitHubPullRequest(config.githumb.github.username, config.githumb.github.password);
 
 var redis = new Redis({
   port: 6379,
@@ -13,13 +16,18 @@ var redis = new Redis({
   db: 13
 });
 
+schedule.scheduleJob('0 * * * * *', function() {
+    logger.info("executing job pullRequestReminderJobStep1");
+    pullRequestReminderJobStep1();
+});
+
 var slackClient = new SlackService(function(message) {
     logger.info("Received message from slack: " + (message));
-    console.log(message);
 
     tryHandleBindRepoToChannel(message);
     tryHandleUnbindRepoFromChannel(message);
     tryHandleAddUserToRepo(message);
+    tryHandleMapUserToGithubLogin(message);
 });
 
 function tryHandleBindRepoToChannel(message) {
@@ -30,11 +38,10 @@ function tryHandleBindRepoToChannel(message) {
 
     if (regexResult != null && regexResult[1] != null) {
         bindRepoToChannel(regexResult[1], message.channel, function(success) {
-            var channel = slackClient.getChannelGroupOrDMByID(message.channel);
             if (success) {
-                channel.send(":ok_hand:");
+                sendMessageToChannel(message.channel, ":ok_hand:");
             } else {
-                channel.send(":fu:");
+                sendMessageToChannel(message.channel, ":fu:");
             }
         });
     }
@@ -48,12 +55,10 @@ function tryHandleUnbindRepoFromChannel(message) {
 
     if (regexResult != null && regexResult[1] != null) {
         unbindRepoFromChannel(regexResult[1], message.channel, function(success) {
-            var channel = slackClient.getChannelGroupOrDMByID(message.channel);
-
             if (success) {
-                channel.send(":see_no_evil: :hear_no_evil: :speak_no_evil:");
+                sendMessageToChannel(message.channel, ":see_no_evil: :hear_no_evil: :speak_no_evil:");
             } else {
-                channel.send(":fu:");
+                sendMessageToChannel(message.channel, ":fu:");
             }
         });
     }
@@ -79,23 +84,48 @@ function tryHandleAddUserToRepo(message) {
         var repoFullName = regexResult[2];
 
         bindUserIdsToRepo(userIds, repoFullName, function(success) {
-            var channel = slackClient.getChannelGroupOrDMByID(message.channel);
-
             if (success) {
-                channel.send(":ok_hand:");
-
+                sendMessageToChannel(message.channel, ":ok_hand:");
                 userIds.forEach(function(f) {
-                    slackClient.openDM(f, function(result) {
-                        if (result != null && result.ok) {
-                            var channel = slackClient.getChannelGroupOrDMByID(result.channel.id);
-                            channel.send("You've been added to repo [" + repoFullName + "] :fu:");
-                        }
-                    });
+                    sendDmToUserId(f, "You've been added to repo [" + repoFullName + "] :fu: by <@" + commandIssuer.id + ">");
                 });
             } else {
-                channel.send(":fu:");
+                sendMessageToChannel(message.channel, ":fu:");
             }
+        }, function(userId) {
+            sendMessageToChannel(message.channel, "User <@" + userId + "> is not mapped to Github Login yet :fu: :fu: :fu:");
         });
+    }
+}
+
+function tryHandleMapUserToGithubLogin(message) {
+    if (message == null || message.text == null || message.user == null) {
+        return;
+    }
+
+    var regexResult = message.text.match(/set\s+(<@[A-Za-z0-9]+>)\s+github\s+login\s+as\s+(.+)/i);
+    if (regexResult != null && regexResult[2] != null) {
+        var commandIssuer = slackClient.getUserByID(message.user);
+        if (config.githumb.bot.admins.find(function(element, index, array) {
+            return element == commandIssuer.name;
+        }) == null) {
+            var channel = slackClient.getChannelGroupOrDMByID(message.channel);
+            channel.send("You're not authorized to do this :fu: :fu: :fu:");
+            return;
+        }
+
+        var userIds = extractUserIdsFromString(regexResult[1]);
+        var githubLogin = regexResult[2];
+
+        userIds.forEach(function(userId) {
+            bindUserIdToGithubLogin(userId, githubLogin, function(success) {
+                if (success) {
+                    sendMessageToChannel(message.channel, ":ok_hand:");
+                } else {
+                    sendMessageToChannel(message.channel, ":fu:");
+                }
+            });
+        })
     }
 }
 
@@ -146,7 +176,7 @@ function unbindRepoFromChannel(repoFullName, channelId, callback) {
     });
 }
 
-function bindUserIdsToRepo(userIds, repoFullName, callback) {
+function bindUserIdsToRepo(userIds, repoFullName, callback, callbackUserNotMappedToGithubLogin) {
     redis.hget("repoUsers", repoFullName, function(err, result) {
         if (err == null) {
             var userSet;
@@ -158,7 +188,29 @@ function bindUserIdsToRepo(userIds, repoFullName, callback) {
             }
 
             redis.hset("repoUsers", repoFullName, JSON.stringify(Array.from(userSet)), function(err, result) {
-                logger.info("done adding users [" + userIds + "] to repo [" + repoFullName + "]");
+                logger.info("done adding userIds [" + userIds + "] to repo [" + repoFullName + "]");
+
+                userIds.forEach(function(userId) {
+                    redis.hget("userGithubLogins", userId, function(err, result) {
+                        if (err == null && result == null) {
+                            callbackUserNotMappedToGithubLogin(userId);
+                        }
+                    });
+                });
+
+                callback(true);
+            });
+        } else {
+            callback(false);
+        }
+    });
+}
+
+function bindUserIdToGithubLogin(userId, githubLogin, callback) {
+    redis.hget("userGithubLogins", userId, function(err, result) {
+        if (err == null) {
+            redis.hset("userGithubLogins", userId, githubLogin, function(err, result) {
+                logger.info("done binding userId [" + userId + "] to githubLogin [" + githubLogin + "]");
                 callback(true);
             });
         } else {
@@ -184,13 +236,85 @@ function sendRepoNotification(repoFullName, message, callback) {
         if (err == null && result != null) {
             var channelSet = new Set(JSON.parse(result));
             for (let channelId of channelSet) {
-                var channel = slackClient.getChannelGroupOrDMByID(channelId);
-                channel.send(message);
+                sendMessageToChannel(channelId, message);
             }
             callback(true);
         } else {
             callback(false);
         }
+    });
+}
+
+function sendMessageToChannel(channelId, message) {
+    var channel = slackClient.getChannelGroupOrDMByID(channelId);
+    if (channel != null) {
+        channel.send(message);
+    }
+}
+
+function sendDmToUserId(userId, message) {
+    slackClient.openDM(userId, function(result) {
+        if (result != null && result.ok) {
+            sendMessageToChannel(result.channel.id, message);
+        }
+    });
+}
+
+function pullRequestReminderJobStep1() {
+    redis.hkeys("repoUsers", function(err, result) {
+        if (err == null && result != null) {
+            result.forEach(function(repoFullName) {
+                redis.hget("repoUsers", repoFullName, function(_err, _result) {
+                    if (_err == null && _result != null) {
+                        var slackUserIdSet = new Set(JSON.parse(_result));
+                        pullRequestReminderJobStep2(repoFullName, slackUserIdSet);
+                    }
+                });
+            });
+        }
+    });
+}
+
+function pullRequestReminderJobStep2(repoFullName, slackUserIdSet) {
+    gitHubPullRequest.getOpenPullRequestList(repoFullName, function(err, resp, bodyString) {
+        var body = JSON.parse(bodyString);
+        body.forEach(function(pullRequest) {
+            pullRequestReminderJobStep3(repoFullName, slackUserIdSet, pullRequest);
+        });
+    });
+}
+
+function pullRequestReminderJobStep3(repoFullName, slackUserIdSet, pullRequest) {
+    gitHubPullRequest.getPullRequestReviewCommentList(repoFullName, pullRequest.number, function(err, resp, bodyString) {
+        var body = JSON.parse(bodyString);
+        pullRequestReminderJobStep4(repoFullName, slackUserIdSet, pullRequest, body);
+    });
+}
+
+function pullRequestReminderJobStep4(repoFullName, slackUserIdSet, pullRequest, reviewComments) {
+    gitHubPullRequest.getPullRequestIssueCommentList(repoFullName, pullRequest.number, function(err, resp, bodyString) {
+        var body = JSON.parse(bodyString);
+        var issueComments = body;
+
+        var slackUserIds = Array.from(slackUserIdSet);
+
+        slackUserIds.forEach(function(slackUserId) {
+            redis.hget("userGithubLogins", slackUserId, function(_err, _result) {
+                if (_err == null && _result != null) {
+                    var githubLogin = _result;
+
+                    if (!reviewComments.find(function(comment, index, array) {
+                        return comment.user.login == githubLogin;
+                    }) && !issueComments.find(function(comment, index, array) {
+                        return comment.user.login == githubLogin;
+                    })) {
+                        var slackUser = slackClient.getUserByID(slackUserId);
+                        logger.info("notifying slackUser: " + slackUser.name + " to review pullRequest: " + pullRequest.number)
+                        sendDmToUserId(slackUserId, "Gays please review Pull Request: "  + pullRequest.title + "(#" + pullRequest.number + "), author: " + pullRequest.user.login + ", url: " + pullRequest.html_url);
+                    }
+                }
+            });
+        });
     });
 }
 

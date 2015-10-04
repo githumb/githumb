@@ -86,7 +86,11 @@
 
     "githumb": {
         "bot": {
-            "admins": ["andes90", "gde.satrigraha", "hendra"]
+            "admins": ["andes90", "gde.satrigraha", "hendra", "vt.githumb"]
+        },
+        "github": {
+            "username": "githumbot",
+            "password": "githumb123"
         }
     }
 }
