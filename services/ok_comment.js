@@ -17,14 +17,12 @@ module.exports = function(body, res, redis) {
 
     redis.set(pullId, JSON.stringify(pull));
 
-    console.log('total ok: ' + pull.total_ok);
-
-    if (pull.total_ok >= 2) {
+    if (pull.current_ok >= 2) {
       console.log('pull request is completed');
 
       github.addLabelReviewed(body.repository.owner.login, body.repository.name, body.issue.number, function(err, response, body) {
         // TODO notify labeled
-        console.log("added review label");
+        console.log("added reviewed label");
       });
     }
 
