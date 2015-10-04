@@ -19,6 +19,7 @@
     "kraken-js": "^1.0.3",
     "log": "^1.4.0",
     "makara": "^2.0.3",
+    "node-schedule": "^0.2.9",
     "request": "^2.64.0",
     "slack-client": "^1.4.1",
     "underscore": "^1.8.3"
