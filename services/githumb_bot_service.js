@@ -14,12 +14,16 @@ var redis = new Redis({
 
 var slackClient = new SlackService(function(message) {
     logger.info("Received message from slack: " + JSON.stringify(message));
+    console.log(message);
 
     tryHandleBindRepoToChannel(message);
     tryHandleUnbindRepoFromChannel(message);
 });
 
 function tryHandleBindRepoToChannel(message) {
+    if (message == null || message.text == null) {
+        return;
+    }
     var regexResult = message.text.match(/listen\s+to\s+(.+)/i);
 
     if (regexResult != null && regexResult[1] != null) {
@@ -31,6 +35,9 @@ function tryHandleBindRepoToChannel(message) {
 }
 
 function tryHandleUnbindRepoFromChannel(message) {
+    if (message == null || message.text == null) {
+        return;
+    }
     var regexResult = message.text.match(/forget\s+(.+)/i);
 
     if (regexResult != null && regexResult[1] != null) {
@@ -58,9 +65,10 @@ function bindRepoToChannel(repoFullName, channelId, callback) {
                 destinationChannels = Array.from(channelSet);
             }
 
-            redis.set(repoFullName, JSON.stringify(destinationChannels));
-            logger.info("done binding repo [" + repoFullName + "] to channels [" + destinationChannels + "]");
-            callback();
+            redis.set(repoFullName, JSON.stringify(destinationChannels), function(err, result) {
+                logger.info("done binding repo [" + repoFullName + "] to channels [" + destinationChannels + "]");
+                callback();
+            });
         }
     });
 }
@@ -71,10 +79,10 @@ function unbindRepoFromChannel(repoFullName, channelId, callback) {
                 var channelSet = new Set(JSON.parse(result));
                 if (channelSet.has(channelId)) {
                     channelSet.delete(channelId);
-                    redis.set(repoFullName, JSON.stringify(Array.from(channelSet)));
-
-                    logger.info("done unbinding repo [" + repoFullName + "] from channel [" + channelId + "]");
-                    callback(true);
+                    redis.set(repoFullName, JSON.stringify(Array.from(channelSet)), function(err, result) {
+                        logger.info("done unbinding repo [" + repoFullName + "] from channel [" + channelId + "]");
+                        callback(true);
+                    });
                 } else {
                     callback(false);
                 }
