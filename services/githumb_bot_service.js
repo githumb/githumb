@@ -85,7 +85,11 @@ function unbindRepoFromChannel(repoFullName, channelId, callback) {
 }
 
 function buildPullRequestReviewedMessage(pullRequest) {
-    return "Pull request has been `reviewed`: " + pullRequest.title + "(#" + pullRequest.id + "), author: " + pullRequest.author + ", url: " + pullRequest.url;
+    return "Pull request has been `reviewed`: " + pullRequest.title + "(" + pullRequest.id + "), author: " + pullRequest.author + ", url: " + pullRequest.url;
+}
+
+function buildPullRequestExpiredMessage(pullRequest) {
+    return "Pull request has been `expired`, please kindly review: " + pullRequest.title + "(" + pullRequest.id + "), author: " + pullRequest.author + ", url: " + pullRequest.url;
 }
 
 module.exports = {
@@ -100,6 +104,25 @@ module.exports = {
                 }
                 callback(true);
             } else {
+                callback(false);
+            }
+        });
+    },
+
+    notifyPullRequestExpired: function (pullRequest, callback) {
+        redis.get(pullRequest.repoFullName, function(err, result) {
+            if (err == null && result != null) {
+                var channelSet = new Set(JSON.parse(result));
+                var message = buildPullRequestExpiredMessage(pullRequest);
+                console.log("Message : " + message);
+                for (let channelId of channelSet) {
+                    var channel = slackClient.getChannelGroupOrDMByID(channelId);
+                    channel.send(message);
+                }
+                callback(true);
+            } else {
+                console.log("Error : " + err);
+                console.log("Result : " + result);
                 callback(false);
             }
         });
