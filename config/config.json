@@ -82,5 +82,11 @@
             }
         }
 
+    },
+
+    "githumb": {
+        "bot": {
+            "admins": ["andes90", "gde.satrigraha", "hendra"]
+        }
     }
 }
