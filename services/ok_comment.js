@@ -4,6 +4,7 @@ var Github = require('./external/github/label');
 var github = Github('githumbot', 'githumb123');
 var Log = require('log');
 var githumbBot = require("./githumb_bot_service");
+var expiredLogic = require('./expired_notify')
 
 module.exports = function(body, res, redis) {
   var pullId = body.repository.id + '-' + body.issue.number;
@@ -31,6 +32,7 @@ module.exports = function(body, res, redis) {
           author: body.issue.user.login,
         }, function(success) {
           console.log("added reviewed label");
+          expiredLogic.removeFromExpiredNotify(body);
         });
       });
     }
