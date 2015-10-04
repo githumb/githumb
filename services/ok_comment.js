@@ -1,6 +1,6 @@
 'use strict';
 
-models.exports = function(redis) {
+models.exports = function(req, res, redis) {
 
   redis.get(pullId, function(err, result) {
     console.log(result);

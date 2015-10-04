@@ -18,7 +18,7 @@ module.exports = function(req, res) {
   console.log('pull id: ' + pullId);
 
   if (isPullRequestCommentOk(body)) {
-    okCommentLogic(redis);
+    okCommentLogic(req, res, redis);
   }
 }
 
