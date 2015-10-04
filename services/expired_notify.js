@@ -11,7 +11,7 @@ module.exports = {
       title: body.pull_request.title,
       id: body.pull_request.number,
       author: body.pull_request.user.login,
-      url: body.pull_request.url
+      url: body.pull_request.html_url
     };
 
     var timer = setTimeout(function() {
