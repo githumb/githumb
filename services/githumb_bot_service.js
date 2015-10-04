@@ -328,6 +328,6 @@ module.exports = {
     },
 
     notifyPullRequestExpired: function (pullRequest, callback) {
-        sendRepoNotification(pullRequest.repoFullName, getChannelGroupOrDMByID(pullRequest), callback);
-    },
+        sendRepoNotification(pullRequest.repoFullName, buildPullRequestExpiredMessage(pullRequest), callback);
+    }
 };

@@ -19,7 +19,10 @@ module.exports = function(body, res, redis) {
     var reviewComment = parse(pullId, result);
 
     if (!_.contains(reviewComment.active_reviews, commentId)) {
-      reviewComment.active_reviews.push(commentId);
+      reviewComment.active_reviews.push({
+        id: commentId,
+        file_name: body.comment.path
+      });
     }
 
     redis.set(pullId, JSON.stringify(reviewComment));
