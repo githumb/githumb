@@ -54,7 +54,7 @@ function tryHandleUnbindRepoFromChannel(message) {
 }
 
 function bindRepoToChannel(repoFullName, channelId, callback) {
-    redis.get(repoFullName, function(err, result) {
+    redis.hget("repoChannel", repoFullName, function(err, result) {
         if (err == null) {
             var destinationChannels;
 
@@ -65,7 +65,7 @@ function bindRepoToChannel(repoFullName, channelId, callback) {
                 destinationChannels = Array.from(channelSet);
             }
 
-            redis.set(repoFullName, JSON.stringify(destinationChannels), function(err, result) {
+            redis.hset("repoChannel", repoFullName, JSON.stringify(destinationChannels), function(err, result) {
                 logger.info("done binding repo [" + repoFullName + "] to channels [" + destinationChannels + "]");
                 callback();
             });
@@ -74,12 +74,12 @@ function bindRepoToChannel(repoFullName, channelId, callback) {
 }
 
 function unbindRepoFromChannel(repoFullName, channelId, callback) {
-    redis.get(repoFullName, function(err, result) {
+    redis.hget("repoChannel", repoFullName, function(err, result) {
         if (err == null && result != null) {
                 var channelSet = new Set(JSON.parse(result));
                 if (channelSet.has(channelId)) {
                     channelSet.delete(channelId);
-                    redis.set(repoFullName, JSON.stringify(Array.from(channelSet)), function(err, result) {
+                    redis.hset("repoChannel", repoFullName, JSON.stringify(Array.from(channelSet)), function(err, result) {
                         logger.info("done unbinding repo [" + repoFullName + "] from channel [" + channelId + "]");
                         callback(true);
                     });
@@ -98,7 +98,7 @@ function buildPullRequestReviewedMessage(pullRequest) {
 
 module.exports = {
     notifyPullRequestReviewed: function(pullRequest, callback) {
-        redis.get(pullRequest.repoFullName, function(err, result) {
+        redis.hget("repoChannel", pullRequest.repoFullName, function(err, result) {
             if (err == null && result != null) {
                 var channelSet = new Set(JSON.parse(result));
                 var message = buildPullRequestReviewedMessage(pullRequest);
