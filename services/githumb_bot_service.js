@@ -104,54 +104,31 @@ function buildPullRequestExpiredMessage(pullRequest) {
     return "Pull request has been `expired`, please kindly review: " + pullRequest.title + "(" + pullRequest.id + "), author: " + pullRequest.author + ", url: " + pullRequest.url;
 }
 
+function sendRepoNotification(repoFullName, message, callback) {
+    redis.hget("repoChannel", repoFullName, function(err, result) {
+        if (err == null && result != null) {
+            var channelSet = new Set(JSON.parse(result));
+            for (let channelId of channelSet) {
+                var channel = slackClient.getChannelGroupOrDMByID(channelId);
+                channel.send(message);
+            }
+            callback(true);
+        } else {
+            callback(false);
+        }
+    });
+}
+
 module.exports = {
     notifyPullRequestReviewed: function(pullRequest, callback) {
-        redis.hget("repoChannel", pullRequest.repoFullName, function(err, result) {
-            if (err == null && result != null) {
-                var channelSet = new Set(JSON.parse(result));
-                var message = buildPullRequestReviewedMessage(pullRequest);
-                for (let channelId of channelSet) {
-                    var channel = slackClient.getChannelGroupOrDMByID(channelId);
-                    channel.send(message);
-                }
-                callback(true);
-            } else {
-                callback(false);
-            }
-        });
+        sendRepoNotification(pullRequest.repoFullName, buildPullRequestReviewedMessage(pullRequest), callback);
     },
 
     notifyPullRequestUnreviewed: function(pullRequest, callback) {
-        redis.hget("repoChannel", pullRequest.repoFullName, function(err, result) {
-            if (err == null && result != null) {
-                var channelSet = new Set(JSON.parse(result));
-                var message = buildPullRequestUnreviewedMessage(pullRequest);
-
-                for (let channelId of channelSet) {
-                    var channel = slackClient.getChannelGroupOrDMByID(channelId);
-                    channel.send(message);
-                }
-                callback(true);
-            } else {
-                callback(false);
-            }
-        });
+        sendRepoNotification(pullRequest.repoFullName, buildPullRequestUnreviewedMessage(pullRequest), callback);
     },
 
     notifyPullRequestExpired: function (pullRequest, callback) {
-        redis.hget("repoChannel", pullRequest.repoFullName, function(err, result) {
-            if (err == null && result != null) {
-                var channelSet = new Set(JSON.parse(result));
-                var message = buildPullRequestExpiredMessage(pullRequest);
-
-                for (let channelId of channelSet) {
-                    var channel = slackClient.getChannelGroupOrDMByID(channelId);
-                    channel.send(message);
-                }
-                callback(true);
-            } else {
-                callback(false);
-            }
-        });
-    }
+        sendRepoNotification(pullRequest.repoFullName, getChannelGroupOrDMByID(pullRequest), callback);
+    },
 };
