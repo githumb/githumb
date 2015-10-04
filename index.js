@@ -2,6 +2,7 @@
 
 var express = require('express');
 var kraken = require('kraken-js');
+var slack = require('./services/slack_service')
 
 
 var options, app;
@@ -23,6 +24,7 @@ options = {
 app = module.exports = express();
 app.use(kraken(options));
 app.on('start', function () {
+    slack.start();
     console.log('Application ready to serve requests.');
     console.log('Environment: %s', app.kraken.get('env:env'));
 });
