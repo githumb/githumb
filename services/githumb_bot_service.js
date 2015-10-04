@@ -2,26 +2,31 @@
 
 var SlackService = require('./slack_service');
 var Log = require('log');
-
-var repoChannelMap = new Map();
+var Redis = require('ioredis');
 
 var logger = new Log('info');
 
+var redis = new Redis({
+  port: 6379,
+  host: '127.0.0.1',
+  db: 13
+});
+
 var slackClient = new SlackService(function(message) {
+    logger.info("Received message from slack: " + JSON.stringify(message));
+
     tryHandleBindRepoToChannel(message);
     tryHandleUnbindRepoFromChannel(message);
-
-    return logger.info("Received message from slack: " + message);
 });
 
 function tryHandleBindRepoToChannel(message) {
     var regexResult = message.text.match(/listen\s+to\s+(.+)/i);
 
     if (regexResult != null && regexResult[1] != null) {
-        if (bindRepoToChannel(regexResult[1], message.channel)) {
+        bindRepoToChannel(regexResult[1], message.channel, function() {
             var channel = slackClient.getChannelGroupOrDMByID(message.channel);
             channel.send(":ok_hand:");
-        }
+        });
     }
 }
 
@@ -29,53 +34,74 @@ function tryHandleUnbindRepoFromChannel(message) {
     var regexResult = message.text.match(/forget\s+(.+)/i);
 
     if (regexResult != null && regexResult[1] != null) {
-        if (unbindRepoFromChannel(regexResult[1], message.channel)) {
+        unbindRepoFromChannel(regexResult[1], message.channel, function(found) {
             var channel = slackClient.getChannelGroupOrDMByID(message.channel);
-            channel.send(":see_no_evil: :hear_no_evil: :speak_no_evil:");
+
+            if (found) {
+                channel.send(":see_no_evil: :hear_no_evil: :speak_no_evil:");
+            } else {
+                channel.send(":fu:");
+            }
+        });
+    }
+}
+
+function bindRepoToChannel(repoFullName, channelId, callback) {
+    redis.get(repoFullName, function(err, result) {
+        if (err == null) {
+            var destinationChannels;
+
+            if (result == null) {
+                destinationChannels = [channelId];
+            } else {
+                var channelSet = new Set(JSON.parse(result)).add(channelId);
+                destinationChannels = Array.from(channelSet);
+            }
+
+            redis.set(repoFullName, JSON.stringify(destinationChannels));
+            logger.info("done binding repo [" + repoFullName + "] to channels [" + destinationChannels + "]");
+            callback();
         }
-    }
+    });
 }
 
-function bindRepoToChannel(repoFullName, channelId) {
-    var channelSet = repoChannelMap.get(repoFullName);
+function unbindRepoFromChannel(repoFullName, channelId, callback) {
+    redis.get(repoFullName, function(err, result) {
+        if (err == null && result != null) {
+                var channelSet = new Set(JSON.parse(result));
+                if (channelSet.has(channelId)) {
+                    channelSet.delete(channelId);
+                    redis.set(repoFullName, JSON.stringify(Array.from(channelSet)));
 
-    if (channelSet == null) {
-        channelSet = new Set();
-        repoChannelMap.set(repoFullName, channelSet);
-    }
-
-    channelSet.add(channelId);
-    logger.info("bind repo [" + repoFullName + "] to channels [" + Array.from(channelSet) + "]");
-
-    return true;
-}
-
-function unbindRepoFromChannel(repoFullName, channelId) {
-    var channelSet = repoChannelMap.get(repoFullName);
-    if (channelSet != null) {
-        channelSet.delete(channelId);
-    }
-
-    logger.info("unbind repo [" + repoFullName + "] from channel [" + channelId + "]");
-    return true;
+                    logger.info("done unbinding repo [" + repoFullName + "] from channel [" + channelId + "]");
+                    callback(true);
+                } else {
+                    callback(false);
+                }
+        } else {
+            callback(false);
+        }
+    });
 }
 
 function buildPullRequestReviewedMessage(pullRequest) {
-    return "Pull request has been reviewed: " + pullRequest.title + "(" + pullRequest.id + "), author: " + pullRequest.author + ", url: " + pullRequest.url;
+    return "Pull request has been `reviewed`: " + pullRequest.title + "(#" + pullRequest.id + "), author: " + pullRequest.author + ", url: " + pullRequest.url;
 }
 
 module.exports = {
-    notifyPullRequestReviewed: function(pullRequest) {
-        var channelSet = repoChannelMap.get(pullRequest.fullName);
-        if (channelSet == null) {
-            return false;
-        }
-
-        var message = buildPullRequestReviewedMessage(pullRequest);
-        for (let channelId of channelSet) {
-            var channel = slackClient.getChannelGroupOrDMByID(channelId);
-            channel.send(message);
-        }
-        return true;
+    notifyPullRequestReviewed: function(pullRequest, callback) {
+        redis.get(pullRequest.repoFullName, function(err, result) {
+            if (err == null && result != null) {
+                var channelSet = new Set(JSON.parse(result));
+                var message = buildPullRequestReviewedMessage(pullRequest);
+                for (let channelId of channelSet) {
+                    var channel = slackClient.getChannelGroupOrDMByID(channelId);
+                    channel.send(message);
+                }
+                callback(true);
+            } else {
+                callback(false);
+            }
+        });
     }
 };

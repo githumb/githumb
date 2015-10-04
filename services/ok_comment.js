@@ -2,6 +2,8 @@
 
 var Github = require('./external/github/label');
 var github = Github('githumbot', 'githumb123');
+var Log = require('log');
+var githumbBot = require("./githumb_bot_service");
 
 module.exports = function(body, res, redis) {
   var pullId = body.repository.id + '-' + body.issue.number;
@@ -22,9 +24,17 @@ module.exports = function(body, res, redis) {
     if (pull.total_ok >= 2) {
       console.log('pull request is completed');
 
-      github.addLabelReviewed(body.repository.owner.login, body.repository.name, body.issue.number, function(err, response, body) {
+      github.addLabelReviewed(body.repository.owner.login, body.repository.name, body.issue.number, function(err, _res, _body) {
         // TODO notify labeled
-        console.log("added review label");
+        githumbBot.notifyPullRequestReviewed({
+          repoFullName: body.repository.full_name,
+          title: body.issue.title,
+          id: body.issue.number,
+          url: body.issue.html_url,
+          author: body.issue.user.login,
+        }, function(success) {
+          console.log("added review label");
+        });
       });
     }
 
