@@ -3,7 +3,7 @@
 var githumbBot = require('./githumb_bot_service');
 var Github = require('./external/github/label');
 var Log = require('log');
-var expiredLogic = require('./expired_notify')
+var expiredLogic = require('./expired_notify');
 
 var github = Github('githumbot', 'githumb123');
 var logger = new Log('info');
