@@ -2,12 +2,18 @@
 
 var okCommentLogic = require('./ok_comment');
 var synchronizeLogic = require('./synchronize');
+var reviewCommentLogic = require('./review_comment');
 var Redis = require('ioredis');
 
-var redis = new Redis({
+var database8 = new Redis({
   port: 6379,
   host: '127.0.0.1',
   db: 8
+});
+var database9 = new Redis({
+  port: 6379,
+  host: '127.0.0.1',
+  db: 9
 });
 
 module.exports = function(req, res) {
@@ -16,10 +22,11 @@ module.exports = function(req, res) {
     var body = req.body;
 
     if (isPullRequestCommentOk(req)) {
-      okCommentLogic(body, res, redis);
+      okCommentLogic(body, res, database8);
     } else if (isSynchronize(req)) {
-      synchronizeLogic(body, res, redis);
+      synchronizeLogic(body, res, database8);
     } else if (isPullRequestReviewComment(req)) {
+      reviewCommentLogic(body, res, database9);
     }
 
     function isPullRequestCommentOk(req) {
