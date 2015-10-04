@@ -1,6 +1,7 @@
 'use strict';
 
 var IndexModel = require('../models/index');
+var SlackAdapter = request('./adapter/slack')
 
 
 module.exports = function (router) {

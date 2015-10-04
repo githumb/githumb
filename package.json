@@ -16,7 +16,8 @@
     "dust-makara-helpers": "^4.1.2",
     "express": "^4.12.2",
     "kraken-js": "^1.0.3",
-    "makara": "^2.0.3"
+    "makara": "^2.0.3",
+    "slack-client": "^1.4.1"
   },
   "devDependencies": {
     "grunt": "^0.4.5",
