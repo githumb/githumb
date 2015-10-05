@@ -23,6 +23,10 @@ module.exports = function(body, res, redis) {
         id: commentId,
         file_name: body.comment.path
       });
+
+      github.removeLabelReviewed(body.repository.owner.login, body.repository.name, body.pull_request.number, function(err, resp, bodyString) {
+        console.log("reviewed label has been removed");
+      });
     }
 
     redis.set(pullId, JSON.stringify(reviewComment));
