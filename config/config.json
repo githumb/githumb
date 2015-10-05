@@ -102,6 +102,6 @@
             "username": "githumbot",
             "password": "githumb123"
         },
-        "ulartangga_url": "http://www.google.com"
+        "ulartangga_url": "http://127.0.0.1:4005"
     }
 }

@@ -17,26 +17,21 @@ module.exports = {
   upvote: function(upvote_data, error) {
     var factorId = 0;
     if (upvote_data.part == "code_ninja") {
-      factorId = 0;
-    } else if (upvote_data.part == "bug_buster") {
       factorId = 1;
+    } else if (upvote_data.part == "bug_buster") {
+      factorId = 2;
     } else {
       return;
     }
 
-    var upvoteUri = config.ulartangga_url + "/" + upvote_data.id_upvoted + "/undi?factor_id=" + factorId;
+    var upvoteUri = config.ulartangga_url + "/users/" + upvote_data.id_upvoted + "/undi?factor_id=" + factorId;
+    console.log(upvoteUri);
 
     request({method: 'get', uri: upvoteUri}, function (err, res, body) {
       if (err) {
         console.error("Failed to post to ular tangga");
         return error(err);
-      } else {
-        if (res.statusesCode)
-        console.info(res.statusCode)
-        console.info(body)
-
-        return error(null)
       }
-    })
+    });
   }
 }
